@@ -13,8 +13,13 @@ public class GhostAI : MonoBehaviour
     [SerializeField] private Transform[] waypoints;
     [SerializeField] private float waitTimeAtPoint = 1f;
 
-    [Header("Deteksi & Penangkapan")]
-    [SerializeField] private float detectionRadius = 4.5f;
+    [Header("Stealth: Penglihatan & Pendengaran")]
+    [SerializeField] private float viewDistance = 5.5f;
+    [Range(30f, 180f)]
+    [SerializeField] private float viewAngle = 95f;
+    [SerializeField] private float hearingSensitivity = 1.0f;
+    [SerializeField] private LayerMask obstacleLayer;
+    [SerializeField] private float searchDuration = 2f;
     [SerializeField] private bool defaultFacingRight = true;
 
     [Header("Audio (Opsional)")]
@@ -30,6 +35,10 @@ public class GhostAI : MonoBehaviour
     private int currentWaypointIndex;
     private float waitTimer;
     private bool isChasing;
+    private bool isInvestigating;
+    private Vector2 lastKnownPosition;
+    private float searchTimer;
+    private Vector2 facingDirection = Vector2.down;
 
     private static readonly int MoveXHash = Animator.StringToHash("MoveX");
     private static readonly int MoveYHash = Animator.StringToHash("MoveY");
@@ -57,10 +66,22 @@ public class GhostAI : MonoBehaviour
     {
         if (playerTransform == null || playerMovement == null) return;
 
-        float distanceToPlayer = Vector2.Distance(transform.position, playerTransform.position);
-        isChasing = !playerMovement.IsHiding && distanceToPlayer <= detectionRadius;
+        bool spotted = CanSeePlayer() || CanHearPlayer();
 
-        // Kirim status kejar ke Animator (Walk_Tree <-> Run_Tree)
+        if (spotted)
+        {
+            isChasing = true;
+            isInvestigating = false;
+            lastKnownPosition = playerTransform.position;
+            searchTimer = searchDuration;
+        }
+        else if (isChasing)
+        {
+            // Kehilangan kontak (masuk lemari / berbelok balik tembok) -> cek lokasi terakhir
+            isChasing = false;
+            isInvestigating = true;
+        }
+
         animator.SetBool(IsChasingHash, isChasing);
     }
 
@@ -70,17 +91,68 @@ public class GhostAI : MonoBehaviour
         {
             ChasePlayer();
         }
+        else if (isInvestigating)
+        {
+            InvestigateLastPosition();
+        }
         else
         {
             Patrol();
         }
     }
 
+    private bool CanSeePlayer()
+    {
+        if (playerMovement.IsHiding) return false;
+
+        Vector2 dirToPlayer = (Vector2)playerTransform.position - rb.position;
+        float distance = dirToPlayer.magnitude;
+
+        if (distance > viewDistance) return false;
+
+        // Cek apakah pemain berada di dalam kerucut arah hadap hantu
+        float angle = Vector2.Angle(facingDirection, dirToPlayer.normalized);
+        if (angle > viewAngle * 0.5f) return false;
+
+        // Cek apakah terhalang tembok / objek di obstacleLayer
+        RaycastHit2D hit = Physics2D.Raycast(rb.position, dirToPlayer.normalized, distance, obstacleLayer);
+        return hit.collider == null;
+    }
+
+    private bool CanHearPlayer()
+    {
+        if (playerMovement.IsHiding) return false;
+
+        float effectiveHearingRange = playerMovement.CurrentNoiseRadius * hearingSensitivity;
+        if (effectiveHearingRange <= 0.01f) return false;
+
+        float distance = Vector2.Distance(rb.position, playerTransform.position);
+        return distance <= effectiveHearingRange;
+    }
+
     private void ChasePlayer()
     {
-        Vector2 direction = (playerTransform.position - transform.position).normalized;
+        Vector2 direction = ((Vector2)playerTransform.position - rb.position).normalized;
         rb.MovePosition(rb.position + direction * chaseSpeed * Time.fixedDeltaTime);
         UpdateAnimationDirection(direction);
+    }
+
+    private void InvestigateLastPosition()
+    {
+        Vector2 direction = lastKnownPosition - rb.position;
+
+        if (direction.magnitude <= 0.2f)
+        {
+            searchTimer -= Time.fixedDeltaTime;
+            if (searchTimer <= 0f)
+                isInvestigating = false;
+        }
+        else
+        {
+            Vector2 moveDir = direction.normalized;
+            rb.MovePosition(rb.position + moveDir * patrolSpeed * Time.fixedDeltaTime);
+            UpdateAnimationDirection(moveDir);
+        }
     }
 
     private void Patrol()
@@ -90,7 +162,7 @@ public class GhostAI : MonoBehaviour
         Transform targetPoint = waypoints[currentWaypointIndex];
         if (targetPoint == null) return;
 
-        Vector2 direction = ((Vector2)targetPoint.position - rb.position);
+        Vector2 direction = (Vector2)targetPoint.position - rb.position;
 
         if (direction.magnitude <= 0.15f)
         {
@@ -111,7 +183,9 @@ public class GhostAI : MonoBehaviour
 
     private void UpdateAnimationDirection(Vector2 dir)
     {
-        // Kirim arah gerak ke Blend Tree (Up, Down, Left, Right)
+        if (dir.sqrMagnitude > 0.01f)
+            facingDirection = dir.normalized;
+
         animator.SetFloat(MoveXHash, dir.x);
         animator.SetFloat(MoveYHash, dir.y);
 
@@ -136,9 +210,15 @@ public class GhostAI : MonoBehaviour
         }
     }
 
+    // Visualisasi kerucut pandang hantu di jendela Scene
     private void OnDrawGizmosSelected()
     {
         Gizmos.color = Color.red;
-        Gizmos.DrawWireSphere(transform.position, detectionRadius);
+        Vector3 leftBoundary = Quaternion.Euler(0, 0, viewAngle * 0.5f) * facingDirection * viewDistance;
+        Vector3 rightBoundary = Quaternion.Euler(0, 0, -viewAngle * 0.5f) * facingDirection * viewDistance;
+
+        Gizmos.DrawLine(transform.position, transform.position + leftBoundary);
+        Gizmos.DrawLine(transform.position, transform.position + rightBoundary);
+        Gizmos.DrawWireSphere(transform.position, viewDistance);
     }
 }

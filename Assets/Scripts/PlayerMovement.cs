@@ -6,8 +6,15 @@ using UnityEngine;
 public class PlayerMovement : MonoBehaviour
 {
     [Header("Kecepatan Gerak")]
+    [SerializeField] private float sneakSpeed = 1.8f;
     [SerializeField] private float walkSpeed = 3.5f;
     [SerializeField] private float runSpeed = 6.0f;
+
+    [Header("Kontrol & Radius Kebisingan (Stealth)")]
+    [SerializeField] private KeyCode sneakKey = KeyCode.LeftControl;
+    [SerializeField] private float sneakNoiseRadius = 0.4f;
+    [SerializeField] private float walkNoiseRadius = 1.8f;
+    [SerializeField] private float runNoiseRadius = 5.0f;
 
     private Rigidbody2D rb;
     private Animator animator;
@@ -15,10 +22,13 @@ public class PlayerMovement : MonoBehaviour
 
     private Vector2 moveInput;
     private Vector2 lastMoveDirection = Vector2.down;
+    private bool isSneaking;
     private bool isRunning;
     private bool isHiding;
 
     public bool IsHiding => isHiding;
+    public bool IsSneaking => isSneaking;
+    public float CurrentNoiseRadius { get; private set; }
 
     private static readonly int MoveXHash = Animator.StringToHash("MoveX");
     private static readonly int MoveYHash = Animator.StringToHash("MoveY");
@@ -38,7 +48,9 @@ public class PlayerMovement : MonoBehaviour
         if (isHiding)
         {
             moveInput = Vector2.zero;
+            isSneaking = false;
             isRunning = false;
+            CurrentNoiseRadius = 0f;
             return;
         }
 
@@ -46,9 +58,22 @@ public class PlayerMovement : MonoBehaviour
         float inputY = Input.GetAxisRaw("Vertical");
 
         moveInput = new Vector2(inputX, inputY).normalized;
-        isRunning = Input.GetKey(KeyCode.LeftShift) && moveInput.sqrMagnitude > 0.01f;
+        bool isMoving = moveInput.sqrMagnitude > 0.01f;
 
-        if (moveInput.sqrMagnitude > 0.01f)
+        // Mengendap (Left Ctrl) otomatis memakai animasi Walk biasa karena IsRunning = false
+        isSneaking = isMoving && Input.GetKey(sneakKey);
+        isRunning = isMoving && !isSneaking && Input.GetKey(KeyCode.LeftShift);
+
+        if (!isMoving)
+            CurrentNoiseRadius = 0f;
+        else if (isSneaking)
+            CurrentNoiseRadius = sneakNoiseRadius;
+        else if (isRunning)
+            CurrentNoiseRadius = runNoiseRadius;
+        else
+            CurrentNoiseRadius = walkNoiseRadius;
+
+        if (isMoving)
         {
             lastMoveDirection = moveInput;
 
@@ -73,14 +98,29 @@ public class PlayerMovement : MonoBehaviour
             return;
         }
 
-        float currentSpeed = isRunning ? runSpeed : walkSpeed;
+        float currentSpeed = walkSpeed;
+        if (isSneaking) currentSpeed = sneakSpeed;
+        else if (isRunning) currentSpeed = runSpeed;
+
         rb.linearVelocity = moveInput * currentSpeed;
     }
 
     public void SetHiding(bool hiding)
     {
         isHiding = hiding;
+        isSneaking = false;
+        isRunning = false;
+        CurrentNoiseRadius = 0f;
         rb.linearVelocity = Vector2.zero;
+        animator.SetFloat(SpeedHash, 0f);
+        animator.SetBool(IsRunningHash, false);
         animator.SetBool(IsHidingHash, isHiding);
+    }
+
+    // Visualisasi lingkaran suara pemain di jendela Scene (lingkaran kuning)
+    private void OnDrawGizmosSelected()
+    {
+        Gizmos.color = Color.yellow;
+        Gizmos.DrawWireSphere(transform.position, CurrentNoiseRadius);
     }
 }
