@@ -268,7 +268,13 @@ MonoBehaviour:
   waypoints:
   - {fileID: 0}
   waitTimeAtPoint: 1
-  detectionRadius: 4.5
+  viewDistance: 5.5
+  viewAngle: 95
+  hearingSensitivity: 1
+  obstacleLayer:
+    serializedVersion: 2
+    m_Bits: 0
+  searchDuration: 2
   defaultFacingRight: 0
   catchSound: {fileID: 0}
 --- !u!50 &97659477
@@ -332,6 +338,7 @@ GameObject:
   - component: {fileID: 519420031}
   - component: {fileID: 519420029}
   - component: {fileID: 519420030}
+  - component: {fileID: 519420033}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -457,6 +464,24 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &519420033
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 519420028}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0ed4d7f0d3620af40bf75ae026a11409, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CameraFollow
+  target: {fileID: 4787959583975241689}
+  smoothSpeed: 6
+  offset: {x: 0, y: 0, z: -10}
+  useBounds: 0
+  minBounds: {x: 0, y: 0}
+  maxBounds: {x: 0, y: 0}
 --- !u!1 &619394800
 GameObject:
   m_ObjectHideFlags: 0
@@ -818,7 +843,7 @@ Rigidbody2D:
   m_ExcludeLayers:
     serializedVersion: 2
     m_Bits: 0
-  m_Interpolate: 0
+  m_Interpolate: 1
   m_SleepingMode: 1
   m_CollisionDetection: 0
   m_Constraints: 4
@@ -834,8 +859,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 159cd321d0ee411479605a44e7f39fab, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerMovement
+  sneakSpeed: 1.8
   walkSpeed: 3.5
   runSpeed: 6
+  sneakKey: 306
+  sneakNoiseRadius: 0.4
+  walkNoiseRadius: 1.8
+  runNoiseRadius: 5
 --- !u!95 &4787959583975241686
 Animator:
   serializedVersion: 7
