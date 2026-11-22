@@ -16,11 +16,15 @@ public class PlayerMovement : MonoBehaviour
     private Vector2 moveInput;
     private Vector2 lastMoveDirection = Vector2.down;
     private bool isRunning;
+    private bool isHiding;
+
+    public bool IsHiding => isHiding;
 
     private static readonly int MoveXHash = Animator.StringToHash("MoveX");
     private static readonly int MoveYHash = Animator.StringToHash("MoveY");
     private static readonly int SpeedHash = Animator.StringToHash("Speed");
     private static readonly int IsRunningHash = Animator.StringToHash("IsRunning");
+    private static readonly int IsHidingHash = Animator.StringToHash("IsHiding");
 
     private void Awake()
     {
@@ -31,6 +35,13 @@ public class PlayerMovement : MonoBehaviour
 
     private void Update()
     {
+        if (isHiding)
+        {
+            moveInput = Vector2.zero;
+            isRunning = false;
+            return;
+        }
+
         float inputX = Input.GetAxisRaw("Horizontal");
         float inputY = Input.GetAxisRaw("Vertical");
 
@@ -56,7 +67,20 @@ public class PlayerMovement : MonoBehaviour
 
     private void FixedUpdate()
     {
+        if (isHiding)
+        {
+            rb.linearVelocity = Vector2.zero;
+            return;
+        }
+
         float currentSpeed = isRunning ? runSpeed : walkSpeed;
         rb.linearVelocity = moveInput * currentSpeed;
+    }
+
+    public void SetHiding(bool hiding)
+    {
+        isHiding = hiding;
+        rb.linearVelocity = Vector2.zero;
+        animator.SetBool(IsHidingHash, isHiding);
     }
 }
